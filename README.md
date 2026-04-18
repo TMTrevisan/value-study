@@ -1,16 +1,40 @@
-# React + Vite
+# Watercolor Value Study Tool 🎨
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A minimalist, privacy-first web application designed to help artists translate complex reference photos into simplified value layers. 
 
-Currently, two official plugins are available:
+Built immediately to run locally inside your browser (meaning no images are ever sent to a server), this tool calculates exact image luminance values to break difficult subjects down into 2 to 9 visual blocks. Extremely useful for watercolorists, gouache painters, or concept artists looking to establish foundational tone mapping.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+**[Live Demo via Vercel](https://value-study.vercel.app)**
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Standard Luminance Mapping:** Accurate toggling into Grayscale using standard relative luminance calculation equations (`0.299*R + 0.587*G + 0.114*B`).
+- **Dynamic Posterization Engine:** A smooth slider dictating the total tonal limit for the composition (2 to 9 values).
+- **Threshold Swatch Isolation:** Every tonal bucket becomes a selectable swatch; clicking an individual swatch converts anything bound to that specific luminance bucket into a vivid high-contrast overlay (`Red-500`) to quickly lock down shape outlines.
+- **Client-Side HTML5 Canvas:** Processing is extremely fast regardless of complex uploads. We utilize an off-DOM scalable layout mapped via a hidden 2D context to run `getImageData` pixel chunking.
 
-## Expanding the ESLint configuration
+## Quick Start
+To set up this environment locally:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+# Clone the repository
+git clone https://github.com/TMTrevisan/value-study.git
+cd value-study
+
+# Install the minimal dependencies
+npm install
+
+# Start the active Vite development server
+npm run dev
+```
+
+You can then view the application safely at `http://localhost:5173`. If you'd like to beam this over your Wi-Fi directly to an iPad/Tablet sitting on your easel, stop the server and instead run:
+```bash
+npm run dev -- --host
+```
+
+## Tech Stack
+- Frontend Engine: [React](https://react.dev) + [Vite](https://vitejs.dev)
+- Styling & Responsiveness: [Tailwind CSS v4](https://tailwindcss.com/)
+- Visual Language Structure: [Lucide React](https://lucide.dev/)
+- Image Pipeline: `CanvasRenderingContext2D`
