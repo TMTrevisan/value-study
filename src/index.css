@@ -14,6 +14,7 @@ body {
 /* Custom Scrollbar for better aesthetics */
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -58,4 +59,28 @@ input[type=range]::-webkit-slider-runnable-track {
 
 input[type=range]:focus {
   outline: none;
+}
+
+/* Print Mode Overrides */
+@media print {
+  body {
+    background-color: #fff !important;
+    color: #000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-canvas {
+    width: 100% !important;
+    max-height: 100vh !important;
+    max-width: 100vw !important;
+    object-fit: contain !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
 }
