@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Droplet, Sun, Layers, X, Download, CircleDashed, Contrast, ZoomIn } from 'lucide-react';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { Upload, Droplet, Sun, Layers, X, Download, CircleDashed, Contrast } from 'lucide-react';
 
 export default function App() {
   const [imageObj, setImageObj] = useState(null);
@@ -316,28 +315,11 @@ export default function App() {
 
             {/* Canvas Output */}
             <div className="lg:col-span-3">
-              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-3xl overflow-hidden shadow-xl relative min-h-[60vh] w-full flex flex-col group">
-                
-                {/* Pan & Zoom Wrapper */}
-                <div className="absolute top-4 right-4 z-10 opacity-50 group-hover:opacity-100 transition-opacity bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-white shadow-lg pointer-events-none">
-                  <ZoomIn className="w-4 h-4" /> Scroll/Pinch to Zoom, Drag to Pan
-                </div>
-                
-                <TransformWrapper 
-                   centerOnInit={true} 
-                   initialScale={1} 
-                   minScale={0.5} 
-                   maxScale={8}
-                   wheel={{ step: 0.1 }}
-                >
-                  <TransformComponent wrapperClass="!w-full !h-[70vh] cursor-grab active:cursor-grabbing">
-                    <canvas 
-                      ref={canvasRef} 
-                      className="max-w-full max-h-full object-contain pointer-events-none"
-                    />
-                  </TransformComponent>
-                </TransformWrapper>
-
+              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-3xl p-4 md:p-8 flex items-center justify-center shadow-xl overflow-hidden relative w-full h-full">
+                <canvas 
+                  ref={canvasRef} 
+                  className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl mx-auto block"
+                />
               </div>
             </div>
           </div>
