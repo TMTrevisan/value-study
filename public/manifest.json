@@ -1,0 +1,17 @@
+{
+  "name": "Watercolor Value Study Tool",
+  "short_name": "Value Study",
+  "description": "Simplify reference photos into values",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
