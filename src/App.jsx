@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Droplet, Sun, Layers, X, Download, CircleDashed, Contrast, Printer, Palette, Image as ImageIcon } from 'lucide-react';
+import { Upload, Droplet, Sun, Layers, X, Download, CircleDashed, Contrast, Printer, Palette, Image as ImageIcon, Eye } from 'lucide-react';
 import { get, set } from 'idb-keyval';
 
 const PALETTES = {
@@ -24,6 +24,19 @@ const PALETTES = {
   ],
 };
 
+const hexToRgb = (hex) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+};
+
+const getRelativeLuminance = (r, g, b) => {
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+};
+
 export default function App() {
   const [imageObj, setImageObj] = useState(null);
   const [recentImages, setRecentImages] = useState([]);
@@ -44,13 +57,25 @@ export default function App() {
 
   // Tab 3: Palette Mapping
   const [selectedPalette, setSelectedPalette] = useState('zorn');
+  const [customColors, setCustomColors] = useState([
+    { r: 35, g: 30, b: 28 },    // Dark Gray default
+    { r: 200, g: 153, b: 88 },  // Ocher default
+    { r: 236, g: 232, b: 228 }, // White default
+  ]);
+
+  // Performance Drag & Comparison states
+  const [isDragging, setIsDragging] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
 
   const canvasRef = useRef(null);
 
-  // Load IndexedDB recents
+  // Load IndexedDB recents and custom palette
   useEffect(() => {
     get('recent_uploads').then((val) => {
       if (val && Array.isArray(val)) setRecentImages(val);
+    });
+    get('custom_palette').then((val) => {
+      if (val && Array.isArray(val)) setCustomColors(val);
     });
   }, []);
 
@@ -63,6 +88,11 @@ export default function App() {
   const handleClearHistory = async () => {
     setRecentImages([]);
     await set('recent_uploads', []);
+  };
+
+  const saveCustomColors = async (colors) => {
+    setCustomColors(colors);
+    await set('custom_palette', colors);
   };
 
   const processImageFile = (file) => {
@@ -110,7 +140,6 @@ export default function App() {
     img.onload = () => {
       setImageObj(img);
       setHighlightValue(null);
-      // Bring to front
       saveToHistory(src);
     };
     img.src = src;
@@ -136,22 +165,66 @@ export default function App() {
     window.print();
   };
 
+  // Keyboard shortcut listener for spacebar preview
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code === 'Space' && imageObj) {
+        // Prevent normal page scroll behavior of Spacebar
+        e.preventDefault();
+        setShowOriginal(true);
+      }
+    };
+    const handleKeyUp = (e) => {
+      if (e.code === 'Space') {
+        setShowOriginal(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [imageObj]);
+
+  // Helper drag handlers to pass to sliders
+  const startDrag = () => setIsDragging(true);
+  const endDrag = () => setIsDragging(false);
+  const dragHandlers = {
+    onMouseDown: startDrag,
+    onTouchStart: startDrag,
+    onMouseUp: endDrag,
+    onTouchEnd: endDrag,
+    onMouseLeave: endDrag,
+  };
+
+  // Processing rendering loop
   useEffect(() => {
     if (!imageObj || !canvasRef.current) return;
     
     const canvas = canvasRef.current;
     
-    let width = imageObj.width;
-    let height = imageObj.height;
+    // Low-res draft factor when actively dragging sliders for absolute fluid performance
+    const scale = isDragging ? 0.25 : 1.0;
+    
+    let width = Math.round(imageObj.width * scale);
+    let height = Math.round(imageObj.height * scale);
     
     canvas.width = width;
     canvas.height = height;
 
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     
-    // Apply blur FIRST
+    if (showOriginal) {
+      ctx.drawImage(imageObj, 0, 0, width, height);
+      return;
+    }
+    
+    // Apply blur FIRST (scale blur amount down proportionally for draft mode)
     if (blurAmount > 0) {
-      ctx.filter = `blur(${blurAmount}px)`;
+      const scaledBlur = Math.max(1, Math.round(blurAmount * scale));
+      ctx.filter = `blur(${scaledBlur}px)`;
     } else {
       ctx.filter = 'none';
     }
@@ -167,7 +240,14 @@ export default function App() {
     // Prep palette logic
     let paletteArr = [];
     if (activeTab === 'palette') {
-      paletteArr = PALETTES[selectedPalette];
+      if (selectedPalette === 'custom') {
+        // Dynamic sort custom colors from darkest relative luminance to lightest
+        paletteArr = [...customColors].sort((a, b) => {
+          return getRelativeLuminance(a.r, a.g, a.b) - getRelativeLuminance(b.r, b.g, b.b);
+        });
+      } else {
+        paletteArr = PALETTES[selectedPalette];
+      }
     }
     const palCount = paletteArr.length;
 
@@ -184,9 +264,13 @@ export default function App() {
         outR = outG = outB = val;
       } 
       else if (activeTab === 'palette') {
-        const bucket = Math.min(palCount - 1, Math.floor((L / 256) * palCount));
-        const color = paletteArr[bucket];
-        outR = color.r; outG = color.g; outB = color.b;
+        if (palCount > 0) {
+          const bucket = Math.min(palCount - 1, Math.floor((L / 256) * palCount));
+          const color = paletteArr[bucket];
+          outR = color.r; outG = color.g; outB = color.b;
+        } else {
+          outR = r; outG = g; outB = b;
+        }
       }
       else {
         // 'values' standard posterize
@@ -213,7 +297,7 @@ export default function App() {
     }
 
     ctx.putImageData(imgData, 0, 0);
-  }, [imageObj, activeTab, isGrayscale, posterizeLevels, highlightValue, blurAmount, notanThreshold, selectedPalette]);
+  }, [imageObj, activeTab, isGrayscale, posterizeLevels, highlightValue, blurAmount, notanThreshold, selectedPalette, customColors, showOriginal, isDragging]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-purple-500/30">
@@ -226,7 +310,22 @@ export default function App() {
             </h1>
           </div>
           {imageObj && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Compare toggle button */}
+              <button 
+                onMouseDown={() => setShowOriginal(true)}
+                onMouseUp={() => setShowOriginal(false)}
+                onMouseLeave={() => setShowOriginal(false)}
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  setShowOriginal(true);
+                }}
+                onTouchEnd={() => setShowOriginal(false)}
+                title="Hold to see original"
+                className={`text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 active:scale-95 px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium select-none ${showOriginal ? 'bg-purple-600/30 text-purple-300 ring-2 ring-purple-500' : ''}`}
+              >
+                <Eye className="w-4 h-4" /> <span className="hidden sm:inline">Hold Original</span>
+              </button>
               <button 
                 onClick={handlePrint}
                 title="Print value view"
@@ -243,7 +342,7 @@ export default function App() {
               </button>
               <button 
                 onClick={handleClear}
-                className="text-zinc-400 hover:text-red-400 transition-colors flex items-center gap-1 text-sm font-medium ml-2"
+                className="text-zinc-400 hover:text-red-400 transition-colors flex items-center gap-1 text-sm font-medium ml-1 sm:ml-2"
               >
                 <X className="w-4 h-4" /> <span className="hidden sm:inline">Clear</span>
               </button>
@@ -252,7 +351,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-4 lg:py-8">
         {!imageObj ? (
           <div className="space-y-6 no-print">
             <div className="h-[50vh] flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20 hover:bg-zinc-900/40 hover:border-zinc-700 transition-all cursor-pointer relative group">
@@ -281,23 +380,59 @@ export default function App() {
                 </div>
                 <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
                   {recentImages.map((src, idx) => (
-                    <button 
-                      key={idx}
-                      onClick={() => loadFromHistory(src)}
-                      className="snap-start shrink-0 relative group rounded-xl overflow-hidden border border-zinc-800 hover:border-purple-500 transition-all"
-                    >
-                      <img src={src} className="h-24 w-24 object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300" />
-                    </button>
+                    <div key={idx} className="relative group shrink-0 snap-start">
+                      <button 
+                        onClick={() => loadFromHistory(src)}
+                        className="relative group rounded-xl overflow-hidden border border-zinc-800 hover:border-purple-500 transition-all block focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <img src={src} className="h-24 w-24 object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const updated = recentImages.filter((_, i) => i !== idx);
+                          setRecentImages(updated);
+                          set('recent_uploads', updated);
+                        }}
+                        className="absolute top-1 right-1 bg-black/80 hover:bg-red-600 text-white rounded-full p-1 border border-zinc-700/50 hover:border-red-500 shadow-md md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        title="Delete from history"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
             
+            {/* Canvas Output -> Pinned to top on Mobile viewports */}
+            <div className="order-1 lg:order-2 lg:col-span-3 pb-4 lg:pb-8 print-canvas sticky top-16 z-30 lg:relative lg:top-0 lg:z-auto bg-zinc-950/95 backdrop-blur-md py-3 lg:py-0 border-b border-zinc-900/50 lg:border-none">
+              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl lg:rounded-3xl p-2 lg:p-8 flex items-center justify-center shadow-xl overflow-hidden relative w-full h-[35vh] lg:h-auto lg:min-h-[60vh] print-canvas">
+                <canvas 
+                  ref={canvasRef} 
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    setShowOriginal(true);
+                  }}
+                  onPointerUp={() => setShowOriginal(false)}
+                  onPointerCancel={() => setShowOriginal(false)}
+                  onPointerLeave={() => setShowOriginal(false)}
+                  className="max-w-full max-h-full object-contain rounded-xl shadow-2xl mx-auto block cursor-pointer select-none print-canvas"
+                />
+                
+                {/* Hold to view indicator overlay */}
+                <div className="absolute bottom-4 right-4 z-10 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[10px] sm:text-xs font-medium text-zinc-300 shadow pointer-events-none no-print select-none">
+                  <Eye className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Hold canvas or Spacebar to view original</span>
+                </div>
+              </div>
+            </div>
+
             {/* Sidebar Controls - Hide on Print */}
-            <div className="lg:col-span-1 bg-zinc-900/30 border border-zinc-800/50 rounded-3xl h-fit sticky top-24 no-print overflow-hidden">
+            <div className="order-2 lg:order-1 lg:col-span-1 bg-zinc-900/30 border border-zinc-800/50 rounded-3xl h-fit no-print overflow-hidden">
               
               {/* Top Tabs */}
               <div className="flex border-b border-zinc-800/50 bg-zinc-900/40 text-xs font-semibold">
@@ -355,6 +490,7 @@ export default function App() {
                           setHighlightValue(null);
                         }}
                         className="w-full mb-2"
+                        {...dragHandlers}
                       />
                       <div className="flex justify-between text-xs text-zinc-500 font-medium px-1">
                         <span>2</span><span>5</span><span>9</span>
@@ -404,6 +540,7 @@ export default function App() {
                         value={notanThreshold}
                         onChange={(e) => setNotanThreshold(parseInt(e.target.value))}
                         className="w-full mb-2"
+                        {...dragHandlers}
                       />
                       <div className="flex justify-between text-xs text-zinc-500 font-medium px-1">
                         <span>Darker Bias</span><span>Lighter Bias</span>
@@ -443,8 +580,70 @@ export default function App() {
                             </button>
                           );
                         })}
+
+                        {/* Custom Palette Option */}
+                        <button
+                          onClick={() => setSelectedPalette('custom')}
+                          className={`w-full p-3 rounded-xl border flex flex-col gap-2 transition-all text-left ${selectedPalette === 'custom' ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/50' : 'border-zinc-700/50 hover:border-zinc-500 hover:bg-zinc-800/30'}`}
+                        >
+                          <div className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex justify-between">
+                            <span>Custom Palette ({customColors.length} tones)</span>
+                          </div>
+                          <div className="flex h-6 w-full rounded-md overflow-hidden bg-zinc-800 border border-zinc-700/30">
+                            {customColors.map((c, i) => (
+                              <div key={i} className="flex-1" style={{ backgroundColor: `rgb(${c.r}, ${c.g}, ${c.b})` }} />
+                            ))}
+                            {customColors.length === 0 && (
+                              <div className="w-full flex items-center justify-center text-[10px] text-zinc-500 italic">No colors added yet</div>
+                            )}
+                          </div>
+                        </button>
                       </div>
                     </div>
+
+                    {/* Custom Palette Builder Controls */}
+                    {selectedPalette === 'custom' && (
+                      <div className="mt-4 p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-zinc-400">Palette Colors</span>
+                          <label className="text-xs text-purple-400 hover:text-purple-300 font-semibold cursor-pointer flex items-center gap-1">
+                            <span>+ Add Color</span>
+                            <input 
+                              type="color" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                const hex = e.target.value;
+                                const rgb = hexToRgb(hex);
+                                if (rgb) {
+                                  saveCustomColors([...customColors, rgb]);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2">
+                          {customColors.map((c, idx) => (
+                            <div key={idx} className="relative group/swatch w-9 h-9 rounded-lg border border-zinc-700 overflow-hidden shadow-sm">
+                              <div className="w-full h-full" style={{ backgroundColor: `rgb(${c.r}, ${c.g}, ${c.b})` }} />
+                              <button
+                                onClick={() => {
+                                  const updated = customColors.filter((_, i) => i !== idx);
+                                  saveCustomColors(updated);
+                                }}
+                                className="absolute inset-0 bg-red-600/90 flex items-center justify-center opacity-0 group-hover/swatch:opacity-100 transition-opacity text-white"
+                                title="Delete Color"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-zinc-500 leading-normal">
+                          Colors are dynamically sorted from darkest to lightest when mapping. Hover swatches to delete.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -462,21 +661,13 @@ export default function App() {
                     value={blurAmount}
                     onChange={(e) => setBlurAmount(parseInt(e.target.value))}
                     className="w-full mb-2"
+                    {...dragHandlers}
                   />
                 </div>
 
               </div>
             </div>
 
-            {/* Canvas Output -> Reverts to minimal size and pure white background on Print */}
-            <div className="lg:col-span-3 pb-8 print-canvas">
-              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-3xl p-4 md:p-8 flex items-center justify-center shadow-xl overflow-hidden relative w-full h-full print-canvas">
-                <canvas 
-                  ref={canvasRef} 
-                  className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl mx-auto block print-canvas"
-                />
-              </div>
-            </div>
           </div>
         )}
       </main>
