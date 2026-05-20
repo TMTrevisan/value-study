@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Droplet, Sun, Layers, X, Download, CircleDashed, Contrast, Printer, Palette, Image as ImageIcon, Eye } from 'lucide-react';
+import { Upload, Droplet, Sun, Layers, X, Download, CircleDashed, Contrast, Printer, Palette, Image as ImageIcon, Eye, HelpCircle } from 'lucide-react';
 import { get, set } from 'idb-keyval';
 
 const PALETTES = {
@@ -63,9 +63,10 @@ export default function App() {
     { r: 236, g: 232, b: 228 }, // White default
   ]);
 
-  // Performance Drag & Comparison states
+  // Performance Drag, Comparison & Help states
   const [isDragging, setIsDragging] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const canvasRef = useRef(null);
 
@@ -300,7 +301,7 @@ export default function App() {
   }, [imageObj, activeTab, isGrayscale, posterizeLevels, highlightValue, blurAmount, notanThreshold, selectedPalette, customColors, showOriginal, isDragging]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-purple-500/30">
+    <div className="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 font-sans selection:bg-purple-500/30">
       <header className="border-b border-zinc-800/50 bg-zinc-900/50 backdrop-blur-xl sticky top-0 z-50 no-print">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -308,50 +309,67 @@ export default function App() {
             <h1 className="font-semibold text-lg tracking-tight bg-gradient-to-r from-zinc-100 to-zinc-400 bg-clip-text text-transparent hidden sm:block">
               Watercolor Value Study Tool
             </h1>
+            <h1 className="font-semibold text-lg tracking-tight bg-gradient-to-r from-zinc-100 to-zinc-400 bg-clip-text text-transparent sm:hidden">
+              Value Study
+            </h1>
+            <span className="px-1.5 py-0.5 rounded bg-zinc-800/60 text-[9px] text-zinc-400 font-mono border border-zinc-800/50 ml-1">v1.1.0</span>
           </div>
-          {imageObj && (
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Compare toggle button */}
-              <button 
-                onMouseDown={() => setShowOriginal(true)}
-                onMouseUp={() => setShowOriginal(false)}
-                onMouseLeave={() => setShowOriginal(false)}
-                onTouchStart={(e) => {
-                  e.preventDefault();
-                  setShowOriginal(true);
-                }}
-                onTouchEnd={() => setShowOriginal(false)}
-                title="Hold to see original"
-                className={`text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 active:scale-95 px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium select-none ${showOriginal ? 'bg-purple-600/30 text-purple-300 ring-2 ring-purple-500' : ''}`}
-              >
-                <Eye className="w-4 h-4" /> <span className="hidden sm:inline">Hold Original</span>
-              </button>
-              <button 
-                onClick={handlePrint}
-                title="Print value view"
-                className="text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 active:scale-95 px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium"
-              >
-                <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print</span>
-              </button>
-              <button 
-                onClick={handleDownload}
-                title="Download PNG"
-                className="text-white bg-purple-600 hover:bg-purple-700 active:scale-95 px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium shadow-lg shadow-purple-500/20"
-              >
-                <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export</span>
-              </button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {imageObj && (
+              <>
+                {/* Compare toggle button */}
+                <button 
+                  onMouseDown={() => setShowOriginal(true)}
+                  onMouseUp={() => setShowOriginal(false)}
+                  onMouseLeave={() => setShowOriginal(false)}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    setShowOriginal(true);
+                  }}
+                  onTouchEnd={() => setShowOriginal(false)}
+                  title="Hold to see original"
+                  className={`text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 active:scale-95 px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium select-none ${showOriginal ? 'bg-purple-600/30 text-purple-300 ring-2 ring-purple-500' : ''}`}
+                >
+                  <Eye className="w-4 h-4" /> <span className="hidden sm:inline">Hold Original</span>
+                </button>
+                <button 
+                  onClick={handlePrint}
+                  title="Print value view"
+                  className="text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 active:scale-95 px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium"
+                >
+                  <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print</span>
+                </button>
+                <button 
+                  onClick={handleDownload}
+                  title="Download PNG"
+                  className="text-white bg-purple-600 hover:bg-purple-700 active:scale-95 px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium shadow-lg shadow-purple-500/20"
+                >
+                  <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export</span>
+                </button>
+              </>
+            )}
+
+            <button 
+              onClick={() => setShowHelp(true)}
+              title="Show user guide"
+              className="text-zinc-400 hover:text-purple-400 bg-zinc-900 border border-zinc-800 p-1.5 rounded-lg transition-all flex items-center justify-center hover:scale-105 active:scale-95 shadow-md shadow-black/40"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </button>
+
+            {imageObj && (
               <button 
                 onClick={handleClear}
                 className="text-zinc-400 hover:text-red-400 transition-colors flex items-center gap-1 text-sm font-medium ml-1 sm:ml-2"
               >
                 <X className="w-4 h-4" /> <span className="hidden sm:inline">Clear</span>
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-4 lg:py-8">
+      <main className="flex-grow max-w-7xl mx-auto px-4 py-4 lg:py-8 w-full">
         {!imageObj ? (
           <div className="space-y-6 no-print">
             <div className="h-[50vh] flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20 hover:bg-zinc-900/40 hover:border-zinc-700 transition-all cursor-pointer relative group">
@@ -599,6 +617,23 @@ export default function App() {
                           </div>
                         </button>
                       </div>
+
+                      {/* Informational descriptions for presets */}
+                      {selectedPalette === 'zorn' && (
+                        <p className="text-[10px] text-zinc-400 italic mt-2.5 leading-normal animate-in fade-in">
+                          Anders Zorn's limited palette: Titanium White, Yellow Ocher, Cadmium Red, Ivory Black. Great for skin tones and high-key color studies.
+                        </p>
+                      )}
+                      {selectedPalette === 'earth' && (
+                        <p className="text-[10px] text-zinc-400 italic mt-2.5 leading-normal animate-in fade-in">
+                          Classic warm tones: Cream, Buff, Terra Rosa, Umber, Dark Earth. Perfect for warm landscapes and classical underpaintings.
+                        </p>
+                      )}
+                      {selectedPalette === 'cool' && (
+                        <p className="text-[10px] text-zinc-400 italic mt-2.5 leading-normal animate-in fade-in">
+                          Atmospheric cool colors: Ice, Steel Sky, Ocean, Deep Navy. Excellent for water, winter settings, shadows, and low-key values.
+                        </p>
+                      )}
                     </div>
 
                     {/* Custom Palette Builder Controls */}
@@ -671,6 +706,103 @@ export default function App() {
           </div>
         )}
       </main>
+
+      <footer className="border-t border-zinc-900 bg-zinc-950 py-6 text-center text-xs text-zinc-500 mt-auto no-print">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-zinc-400">Value Study Tool</span>
+            <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-[10px] text-zinc-400 font-mono border border-zinc-800/80">v1.1.0</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <a 
+              href="https://github.com/TMTrevisan/value-study" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="hover:text-purple-400 transition-colors flex items-center gap-1.5 font-medium text-zinc-400"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+                <path d="M9 18c-4.51 2-5-2-7-2" />
+              </svg>
+              <span>GitHub Repository</span>
+            </a>
+            <span className="text-zinc-800">•</span>
+            <span className="text-zinc-500">Created for painters & studio artists</span>
+          </div>
+        </div>
+      </footer>
+
+      {showHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 no-print">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl p-6 relative">
+            <button 
+              onClick={() => setShowHelp(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <h2 className="text-xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent flex items-center gap-2">
+              <HelpCircle className="w-6 h-6 text-purple-400" />
+              How to Use Value Study
+            </h2>
+            
+            <div className="space-y-4 text-sm text-zinc-300 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
+              <div>
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-purple-400" /> Values Scale Mode
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Posterize your image into 2 to 9 values. Use the sliders to adjust detail simplification (blur). Click any value swatch below the slider to highlight that specific value range in bright red to study its shape.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <Contrast className="w-4 h-4 text-purple-400" /> Notan Mode
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Convert the image into a strict two-value black-and-white study. Shift the light/dark balance slider to find the core compositional structure of your reference.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-purple-400" /> Limited Color Palettes
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Map the image values onto classical color spectrums (e.g., Zorn palette). Or switch to "Custom Palette" to add/delete your own paint color swatches—they automatically sort by relative luminance!
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-purple-400" /> Compare Original Reference
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Hold down the <strong>Spacebar</strong>, click/touch and hold on the canvas, or press the <strong>Hold Original</strong> button to immediately preview your raw full-color photo for comparison.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <Printer className="w-4 h-4 text-purple-400" /> Print & Export
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Export high-resolution transparent PNG files. Or click <strong>Print</strong> to generate an ink-saving high-contrast output with a white background, ready for painting templates.
+                </p>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowHelp(false)}
+              className="mt-6 w-full py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 rounded-xl font-medium text-white shadow-lg shadow-purple-500/20 transition-all"
+            >
+              Get Painting!
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
