@@ -67,6 +67,7 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [simplifyMode, setSimplifyMode] = useState('gaussian');
 
   const canvasRef = useRef(null);
 
@@ -223,7 +224,7 @@ export default function App() {
     }
     
     // Apply blur FIRST (scale blur amount down proportionally for draft mode)
-    if (blurAmount > 0) {
+    if (blurAmount > 0 && simplifyMode === 'gaussian') {
       const scaledBlur = Math.max(1, Math.round(blurAmount * scale));
       ctx.filter = `blur(${scaledBlur}px)`;
     } else {
@@ -237,6 +238,57 @@ export default function App() {
 
     const imgData = ctx.getImageData(0, 0, width, height);
     const data = imgData.data;
+
+    // Apply Edge-Preserving Smart Blur on pixel data
+    if (blurAmount > 0 && simplifyMode === 'smart') {
+      const srcBuffer = new Uint8ClampedArray(data);
+      const radius = Math.min(3, Math.max(1, Math.round((blurAmount * scale) / 6)));
+      const tolerance = 35; // optimal for mid-to-high contrast edges
+      
+      for (let y = 0; y < height; y++) {
+        const rowOffset = y * width;
+        for (let x = 0; x < width; x++) {
+          const idx = (rowOffset + x) * 4;
+          const rCenter = srcBuffer[idx];
+          const gCenter = srcBuffer[idx + 1];
+          const bCenter = srcBuffer[idx + 2];
+          const lCenter = 0.299 * rCenter + 0.587 * gCenter + 0.114 * bCenter;
+
+          let sumR = 0, sumG = 0, sumB = 0, count = 0;
+
+          // Loop over neighbors within radius
+          for (let dy = -radius; dy <= radius; dy++) {
+            const ny = y + dy;
+            if (ny < 0 || ny >= height) continue;
+            
+            const nRowOffset = ny * width;
+            for (let dx = -radius; dx <= radius; dx++) {
+              const nx = x + dx;
+              if (nx < 0 || nx >= width) continue;
+
+              const nIdx = (nRowOffset + nx) * 4;
+              const nr = srcBuffer[nIdx];
+              const ng = srcBuffer[nIdx + 1];
+              const nb = srcBuffer[nIdx + 2];
+              const nL = 0.299 * nr + 0.587 * ng + 0.114 * nb;
+
+              if (Math.abs(nL - lCenter) <= tolerance) {
+                sumR += nr;
+                sumG += ng;
+                sumB += nb;
+                count++;
+              }
+            }
+          }
+
+          if (count > 0) {
+            data[idx] = sumR / count;
+            data[idx + 1] = sumG / count;
+            data[idx + 2] = sumB / count;
+          }
+        }
+      }
+    }
 
     // Prep palette logic
     let paletteArr = [];
@@ -298,7 +350,7 @@ export default function App() {
     }
 
     ctx.putImageData(imgData, 0, 0);
-  }, [imageObj, activeTab, isGrayscale, posterizeLevels, highlightValue, blurAmount, notanThreshold, selectedPalette, customColors, showOriginal, isDragging]);
+  }, [imageObj, activeTab, isGrayscale, posterizeLevels, highlightValue, blurAmount, simplifyMode, notanThreshold, selectedPalette, customColors, showOriginal, isDragging]);
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 font-sans selection:bg-purple-500/30">
@@ -312,7 +364,7 @@ export default function App() {
             <h1 className="font-semibold text-lg tracking-tight bg-gradient-to-r from-zinc-100 to-zinc-400 bg-clip-text text-transparent sm:hidden">
               Value Study
             </h1>
-            <span className="px-1.5 py-0.5 rounded bg-zinc-800/60 text-[9px] text-zinc-400 font-mono border border-zinc-800/50 ml-1">v1.1.0</span>
+            <span className="px-1.5 py-0.5 rounded bg-zinc-800/60 text-[9px] text-zinc-400 font-mono border border-zinc-800/50 ml-1">v1.2.0</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             {imageObj && (
@@ -698,6 +750,28 @@ export default function App() {
                     className="w-full mb-2"
                     {...dragHandlers}
                   />
+                  {blurAmount > 0 && (
+                    <div className="flex items-center justify-between mt-3 bg-zinc-950/40 p-2.5 rounded-xl border border-zinc-800/60 animate-in fade-in slide-in-from-top-1">
+                      <span className="text-xs font-medium text-zinc-400">Filter Type</span>
+                      <div className="flex bg-zinc-900 rounded-lg p-0.5 border border-zinc-800 text-[10px] font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => setSimplifyMode('gaussian')}
+                          className={`px-2.5 py-1 rounded-md transition-colors ${simplifyMode === 'gaussian' ? 'bg-purple-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        >
+                          Soft (Blur)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSimplifyMode('smart')}
+                          className={`px-2.5 py-1 rounded-md transition-colors ${simplifyMode === 'smart' ? 'bg-purple-600 text-white' : 'text-zinc-555 text-zinc-300'}`}
+                          title="Preserves sharp contrast edges while smoothing details"
+                        >
+                          Sharp (Edge)
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -711,7 +785,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-zinc-400">Value Study Tool</span>
-            <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-[10px] text-zinc-400 font-mono border border-zinc-800/80">v1.1.0</span>
+            <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-[10px] text-zinc-400 font-mono border border-zinc-800/80">v1.2.0</span>
           </div>
           <div className="flex items-center gap-4">
             <a 
@@ -753,7 +827,7 @@ export default function App() {
                   <Layers className="w-4 h-4 text-purple-400" /> Values Scale Mode
                 </h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Posterize your image into 2 to 9 values. Use the sliders to adjust detail simplification (blur). Click any value swatch below the slider to highlight that specific value range in bright red to study its shape.
+                  Posterize your image into 2 to 9 values. Use the sliders to adjust detail simplification. Under the slider, choose <strong>Soft (Blur)</strong> for organic shapes, or <strong>Sharp (Edge)</strong> to preserve sharp contrast borders (useful for mechanical objects, buildings, or planes). Click any value swatch below the slider to highlight that specific value range in bright red.
                 </p>
               </div>
 
